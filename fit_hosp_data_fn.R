@@ -4,17 +4,14 @@ source("hmpv_transmission_model_with_climate.R")
  
 
 fit_hosp_data_fn <- function(parameters, dat) {
-  
-  
+
+
   b1 <- parameters[1] # seasonal amplitude
   trans <- parameters[2] # seasonal peak offset
-  transmission <- parameters[3] # transmission parameter 
+  transmission <- parameters[3] # transmission parameter
   f <- parameters[4] # reporting fraction
-  
-  b2 <- parameters[5]
-  b3 <- parameters[6]
-  b4 <- parameters[7]
-  b5 <- parameters[8]
+
+  b4 <- parameters[5] # climate effect for tmin
   
   
   
@@ -23,17 +20,17 @@ fit_hosp_data_fn <- function(parameters, dat) {
   phi <- (2*pi*(exp(trans))) / (1+exp(trans))
   baseline.txn.rate <- exp(transmission)
   reporting_fraction <- plogis(f)
-  
-  amp_pet <- plogis(b2) *0
-  amp_ppt <- plogis(b3) *0
-  amp_tmin <- plogis(b4) * 0
-  amp_vap <- plogis(b5) *0
-   
-  
-  results <-  
-    ode(y = yinit.vector, 
-        t = my_times,  
-        func = hmpv_transmission_model_climate, 
+
+  amp_pet <- 0
+  amp_ppt <- 0
+  amp_tmin <- plogis(b4)
+  amp_vap <- 0
+
+
+  results <- try(
+    ode(y = yinit.vector,
+        t = my_times,
+        func = hmpv_transmission_model_climate,
         parms = c(parm_for_fit,
                   Amp = Amp,
                   phi = phi,
@@ -42,8 +39,13 @@ fit_hosp_data_fn <- function(parameters, dat) {
                   amp_ppt = amp_ppt,
                   amp_tmin = amp_tmin,
                   amp_vap = amp_vap),
-        atol = 1e-6, 
-        rtol = 1e-6)
+        atol = 1e-5,
+        rtol = 1e-5),
+    silent = TRUE)
+
+  if (inherits(results, "try-error") || any(!is.finite(results))) {
+    return(1e10)
+  }
     
   burnN <- t_burn_in
   results.burned <- results[-c(1:burnN),]
@@ -80,23 +82,28 @@ fit_hosp_data_fn <- function(parameters, dat) {
   S3 <- results.burned[,grep('S3', colnames(results.burned))]
 
 
-  lambda1=matrix(0,nrow=t0,ncol=N_ages)
-  for (t in 1:t0) {lambda1[t,]<-as.vector((1+Amp*cos(2*pi*(t-phi*52.1775)/52.1775) + 
-                                             amp_pet * data_pet[t] + 
-                                             amp_ppt * data_ppt[t] + 
-                                             amp_tmin * data_tmin[t] + 
-                                             amp_vap * data_vap[t])*
-                                            ((I1[t,]+rho1*I2[t,]+rho2*I3[t,]+rho2*I4[t,])
-                                             %*%beta)/sum(results.burned[t,], na.rm = T))}
+  season <- 1 + Amp * cos(2 * pi * (seq_len(t0) - phi * 52.1775) / 52.1775) +
+    amp_pet * data_pet[seq_len(t0)] +
+    amp_ppt * data_ppt[seq_len(t0)] +
+    amp_tmin * data_tmin[seq_len(t0)] +
+    amp_vap * data_vap[seq_len(t0)]
+
+  infectious <- I1 + rho1 * I2 + rho2 * I3 + rho2 * I4
+  contact_effect <- infectious %*% beta
+  pop_total <- rowSums(results.burned, na.rm = TRUE)
+  lambda1 <- sweep(contact_effect, 1, pop_total, "/")
+  lambda1 <- sweep(lambda1, 1, season, "*")
 
 
 
-  H1=matrix(0,nrow=t0,ncol=N_ages)
-  for (i in 1:N_ages){
-    H1[,i]=delta1[i]*S0[,i]*lambda1[,i]+
-      delta2[i]*sigma1*S1[,i]*lambda1[,i]+
-      delta3[i]*sigma2*S2[,i]*lambda1[,i]+
-      delta3[i]*sigma3*S3[,i]*lambda1[,i]}
+  delta1_mat <- matrix(delta1, nrow = t0, ncol = N_ages, byrow = TRUE)
+  delta2_mat <- matrix(delta2, nrow = t0, ncol = N_ages, byrow = TRUE)
+  delta3_mat <- matrix(delta3, nrow = t0, ncol = N_ages, byrow = TRUE)
+
+  H1 <- delta1_mat * S0 * lambda1 +
+    delta2_mat * sigma1 * S1 * lambda1 +
+    delta3_mat * sigma2 * S2 * lambda1 +
+    delta3_mat * sigma3 * S3 * lambda1
 
   H_true <- rowSums(H1,na.rm = T)
   
