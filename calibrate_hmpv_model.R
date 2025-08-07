@@ -41,11 +41,12 @@ parm_for_fit$data_vap = data_vap
 
 
 fitLL <- optim(
-  par = c(-1.6, 0.1, log(9), -1, -1.6, -1.6, -1.6, -1.6),
+  par = c(-1.6, 0.1, log(9), -1, -1.6),
   fn = fit_hosp_data_fn,
   dat = my_data,
   method = "L-BFGS-B",
-  lower = c(-Inf, -Inf, log(8.5), -Inf, -Inf,-Inf,-Inf,-Inf)  # Only constrain 3rd param
+  lower = c(-Inf, -Inf, log(8.5), -Inf, -Inf),  # Only constrain 3rd param
+  control = list(maxit = 200, reltol = 1e-6, trace = 1)
 )
 
 
@@ -53,11 +54,11 @@ parms <- c(parm_for_fit,
            Amp=plogis(fitLL$par[1]),
            phi=(2*pi*(exp(fitLL$par[2]))) / (1+exp(fitLL$par[2])),
            baseline.txn.rate = exp(fitLL$par[3]),
-           reporting_fraction = plogis(fitLL$par[4]), 
-           amp_pet=plogis(fitLL$par[5]) * 0,
-           amp_ppt=plogis(fitLL$par[6]) * 0,
-           amp_tmin=plogis(fitLL$par[7]),
-           amp_vap=plogis(fitLL$par[8]) * 0)
+           reporting_fraction = plogis(fitLL$par[4]),
+           amp_pet=0,
+           amp_ppt=0,
+           amp_tmin=plogis(fitLL$par[5]),
+           amp_vap=0)
           
            
 
