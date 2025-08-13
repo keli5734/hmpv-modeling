@@ -4,8 +4,10 @@ source("hmpv_transmission_model_viral_interference.R")
  
 
 fit_hosp_data_fn <- function(parameters, dat) {
-  
-  
+
+  penalty <- 1e12
+  small <- 1e-12
+
   b1 <- parameters[1] # seasonal amplitude
   trans <- parameters[2] # seasonal peak offset
   transmission <- parameters[3] # transmission parameter 
@@ -88,8 +90,8 @@ fit_hosp_data_fn <- function(parameters, dat) {
   pred_counts <- H_true * parm_for_fit$reporting_fraction
   # H_true represents modeled hospitalizations and should always be > 0.
   # Guard against impossible non-positive or non-finite predictions.
-  if (any(!is.finite(pred_counts)) || any(pred_counts <= 0)) {
-    return(Inf)
+  if (any(!is.finite(pred_counts)) || any(pred_counts <= small)) {
+    return(penalty)
   }
   LLcases <- sum(dpois(x = data_fit,
                    lambda = pred_counts,
@@ -97,8 +99,8 @@ fit_hosp_data_fn <- function(parameters, dat) {
 
 
   total_H1 <- sum(H1, na.rm = T)
-  if (!is.finite(total_H1) || total_H1 <= 0) {
-    return(Inf)
+  if (!is.finite(total_H1) || total_H1 <= small) {
+    return(penalty)
   }
   agedist = c(sum(colSums(H1, na.rm = T)[1:12]),
               sum(colSums(H1, na.rm = T)[13:16]),
@@ -111,7 +113,7 @@ fit_hosp_data_fn <- function(parameters, dat) {
               7*agedist[5]/8)
 
   if (any(!is.finite(agedist))) {
-    return(Inf)
+    return(penalty)
   }
 
   
