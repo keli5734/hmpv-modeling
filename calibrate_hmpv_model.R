@@ -42,13 +42,28 @@ parm_for_fit$reporting_fraction = fitted_parameters$reporting_fraction
 #parm_for_fit$baseline.txn.rate = fitted_parameters$baseline.txn.rate
 
 
+start <- c(b1 = log(0.2),
+           trans = 0.1,
+           transmission = log(8.7),
+           f = log(5e-5))
+
+lower <- c(b1 = log(0.18),
+           trans = 0,
+           transmission = log(8.5),
+           f = log(1e-7))
+
+upper <- c(b1 = log(0.22),
+           trans = 0.3,
+           transmission = log(9),
+           f = log(1e-3))
+
 fitLL <- nlminb(
-  start = c(log(0.2), 0.1, log(8.7), log(5e-5)),
+  start = start,
   objective = fit_hosp_data_fn,   # should return -logLik
   dat = my_data,
-  lower = c(log(0.18), 0, log(8.5), log(1e-7)),
-  upper = c(log(0.22), 0.3, log(9), log(1e-3)),
-  control = list(iter.max = 1000)
+  lower = lower,
+  upper = upper,
+  control = list(iter.max = 1000, trace = TRUE)
 )
 
  
